@@ -4,9 +4,9 @@
 #define linePinR A4
 #define linePinC A3
 #define RECEIVERS 3
-#define irRLeftPin 6
 #define irRFrontPin 7
-#define irRRightPin 8
+#define irRLeftPin 6
+#define irRRightPin 5
 #define sonarPing 2
 #define red 8
 #define green 9
@@ -17,12 +17,15 @@ IRsend irsend;
 Servo right;
 Servo left;
 /*
- * *****Progression*****
+
+   *****Progression*****
+
    Line Following: COMPLETE --- pidSteer()
-   IR transmition: sending write code -- sendHit()
-   IR Receving/LED: working except receve hit doesnt turn off-- irRecv()
-   Backup control method: none
+   IR transmition: sending write code --- sendHit()
+   IR Receving/LED: COMPLETE --- irRecv()
+   Backup control method: in progress --- turnAt()
    remote control: none
+
 */
 int lastHit, cTime, lineL, lineC, lineR, tp, error, offset, lastError, intergral, derivative;
 float kp, ki, kd, steer;
@@ -129,8 +132,8 @@ void sendHit() {
 }
 
 int irRecv() {
-  if(millis - lastHit > 5000){
-    rgb(0,0,0);
+  if (millis - lastHit > 5000) {
+    rgb(0, 0, 0);
   }
   //  Serial.print("irRecv");
   for (int i = 0; i < RECEIVERS; i++) {
@@ -182,12 +185,12 @@ int irRecv() {
 }
 
 void loop() {
-  
+
   //pidSteer();
   //turnAt();
   irRecv();
   //sendHit();
-//  if (millis() - cTime > 5000) {
-//    rgb(0, 0, 0);
-//  }
+  //  if (millis() - cTime > 5000) {
+  //    rgb(0, 0, 0);
+  //  }
 }
