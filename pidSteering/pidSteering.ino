@@ -12,39 +12,33 @@
 #define green 9
 #define blue 10
 IRrecv *irrecvs[RECEIVERS];
-decode_results *results[RECEIVERS];
-
-
+decode_results results;
 IRsend irsend;
 Servo right;
 Servo left;
 /*
-
    *****Progression*****
-
    Line Following: COMPLETE --- pidSteer()
    IR transmition: sending write code --- sendHit()
-   IR Receving/LED: only working on 1 recever --- irRecv()
+   IR Receving/LED: COMPLETE --- irRecv()
    Backup control method: in progress --- turnAt()
    remote control: none
-
 */
-
 int lastHit, cTime, lineL, lineC, lineR, tp, error, offset, lastError, intergral, derivative;
 float kp, ki, kd, steer;
 bool hit;
 void setup() {
+  hit = false;
   lastError = 0;
   Serial.begin(9600);
   attachInterrupt(digitalPinToInterrupt(8), irRecv(), CHANGE);
   Serial.println("init");
-  irrecvs[0] = new IRrecv(5);
-  irrecvs[1] = new IRrecv(6);
-  irrecvs[2] = new IRrecv(7);
+  irrecvs[0] = new IRrecv(irRLeftPin);
+  irrecvs[1] = new IRrecv(irRFrontPin);
+  irrecvs[2] = new IRrecv(irRRightPin);
 
   for (int i = 0; i < RECEIVERS; i++) {
     irrecvs[i]->enableIRIn();
-    Serial.println("enable " + String(i));
   }
 
   offset = 700;
@@ -62,9 +56,9 @@ void setup() {
   left.attach(13);
   right.attach(12);
   rgb(0, 0, 0);
-  hit = false;
-  lastHit = millis();
-  cTime = millis();
+  rgb(0, 255, 0);
+  delay(2000);
+  rgb(0, 0, 0);
 }
 
 float pidSteer() {
@@ -120,23 +114,22 @@ int turnAt() {
     drive(0);
   }
 }
-void element(uint8_t r, uint8_t g, uint8_t b) {
-  rgb(r, g, b);
-  cTime = millis();
-  hit = false;
-}
-void rgb(uint8_t r, uint8_t g, uint8_t b) {
-  digitalWrite(red, r);
-  digitalWrite(green, g);
-  digitalWrite(blue, b);
-}
-
 void sendHit() {
   for (int i  = 0; i < 3; i++) {
     irsend.sendSony(0x5A5 , 3);
     //Serial.println("send hit " + String(i));
     delay(200);
   }
+}
+void rgb(uint8_t r, uint8_t g, uint8_t b) {
+  digitalWrite(red, r);
+  digitalWrite(green, g);
+  digitalWrite(blue, b);
+}
+void element(uint8_t r, uint8_t g, uint8_t b) {
+  rgb(r, g, b);
+  cTime = millis();
+  hit = false;
 }
 
 int irRecv() {
@@ -145,48 +138,47 @@ int irRecv() {
       rgb(0, 0, 0);
       hit = false;
     }
-  }
-  else {
-    if (millis() - cTime > 5000) {
-      rgb(0, 0, 0);
+    for (int i = 0; i < RECEIVERS; i++) {
+      irrecvs[i]->enableIRIn();
+      delay(40);
     }
-  }
-
-  for (int i = 0; i < RECEIVERS; i++) {
-    irrecvs[i]->enableIRIn();
-    delay(40);
-  }
-  for (int i = 0; i < RECEIVERS; i++) {
-    if (irrecvs[i]->decode(results[i]))    {
-      Serial.println(results[i]->value, HEX);
-      if (results[i]->value == 0xB13) {
-        Serial.println("water");
-        element(0, 64, 128);
-      } else if (results[i]->value == 0xC9A) {
-        Serial.println("grass");
-        element(0, 255, 0);
-      } else if (results[i]->value == 0xEA9) {
-        Serial.println("earth");
-        element(128, 20, 128);
-      } else if (results[i]->value == 0xA19) {
-        Serial.println("air");
-        element(255, 255, 255);
-      } else if (results[i]->value == 0xE1E) {
-        Serial.println("electricty");
-        element(128, 128, 0);
-      } else if (results[i]->value == 0xF19) {
-        Serial.println("fire");
-        element(255, 55, 0);
-      } else if (results[i]->value == 0x5A5) {
-        Serial.println("hit");
-        if (millis() - lastHit > 5000) {
-          rgb(128, 0, 0);
-          lastHit = millis();
-          hit = true;
+    for (int i = 0; i < 2; i++) {
+      //    Serial.println ("get results");
+      if (irrecvs[0]->decode(&results))    {
+        //      Serial.println("decode");
+        Serial.println(results.value, HEX);
+        if (results.value == 0xB13) {
+          Serial.println("water");
+          element(0, 64, 128);
+        } else if (results.value == 0xC9A) {
+          Serial.println("grass");
+          element(0, 255, 0);
+        } else if (results.value == 0xEA9) {
+          Serial.println("earth");
+          element(128, 20, 128);
+        } else if (results.value == 0xA19) {
+          Serial.println("air");
+          element(255, 255, 255);
+        } else if (results.value == 0xE1E) {
+          Serial.println("electricty");
+          element(128, 128, 0);
+        } else if (results.value == 0xF19) {
+          Serial.println("fire");
+          element(255, 55, 0);
+        } else if (results.value == 0x5A5) {
+          Serial.println("hit");
+          if (millis() - lastHit > 5000) {
+            rgb(128, 0, 0);
+            lastHit = millis();
+            hit = true;
+          }
+          else {
+            //rgb(0, 0, 0);
+          }
         }
       }
+      irrecvs[i]->resume();
     }
-    irrecvs[i]->resume();
   }
 }
 
@@ -196,5 +188,7 @@ void loop() {
   //turnAt();
   irRecv();
   //sendHit();
-
+  //  if (millis() - cTime > 5000) {
+  //    rgb(0, 0, 0);
+  //  }
 }
