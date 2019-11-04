@@ -62,6 +62,7 @@ void setup() {
   left.attach(13);
   right.attach(12);
   rgb(0, 0, 0);
+  hit = false;
   lastHit = millis();
   cTime = millis();
 }
@@ -142,6 +143,7 @@ int irRecv() {
   if (hit) {
     if (millis() - lastHit > 5000) {
       rgb(0, 0, 0);
+      hit = false;
     }
   }
   else {
@@ -156,27 +158,26 @@ int irRecv() {
   }
   for (int i = 0; i < RECEIVERS; i++) {
     if (irrecvs[i]->decode(results[i]))    {
-      Serial.print("decode " + String(i));
-      Serial.println(results->value, HEX);
-      if (results->value == 0xB13) {
+      Serial.println(results[i]->value, HEX);
+      if (results[i]->value == 0xB13) {
         Serial.println("water");
         element(0, 64, 128);
-      } else if (results->value == 0xC9A) {
+      } else if (results[i]->value == 0xC9A) {
         Serial.println("grass");
         element(0, 255, 0);
-      } else if (results->value == 0xEA9) {
+      } else if (results[i]->value == 0xEA9) {
         Serial.println("earth");
         element(128, 20, 128);
-      } else if (results->value == 0xA19) {
+      } else if (results[i]->value == 0xA19) {
         Serial.println("air");
         element(255, 255, 255);
-      } else if (results->value == 0xE1E) {
+      } else if (results[i]->value == 0xE1E) {
         Serial.println("electricty");
         element(128, 128, 0);
-      } else if (results->value == 0xF19) {
+      } else if (results[i]->value == 0xF19) {
         Serial.println("fire");
         element(255, 55, 0);
-      } else if (results->value == 0x5A5) {
+      } else if (results[i]->value == 0x5A5) {
         Serial.println("hit");
         if (millis() - lastHit > 5000) {
           rgb(128, 0, 0);
