@@ -22,11 +22,12 @@ Servo left;
 
    Line Following: COMPLETE --- pidSteer()
    IR transmition: sending write code --- sendHit()
-   IR Receving/LED: COMPLETE --- irRecv()
+   IR Receving/LED: only working on 1 recever --- irRecv()
    Backup control method: in progress --- turnAt()
    remote control: none
 
 */
+
 int lastHit, cTime, lineL, lineC, lineR, tp, error, offset, lastError, intergral, derivative;
 float kp, ki, kd, steer;
 
@@ -35,12 +36,13 @@ void setup() {
   Serial.begin(9600);
   attachInterrupt(digitalPinToInterrupt(8), irRecv(), CHANGE);
   Serial.println("init");
-  irrecvs[0] = new IRrecv(irRLeftPin);
-  irrecvs[1] = new IRrecv(irRFrontPin);
-  irrecvs[2] = new IRrecv(irRRightPin);
+  irrecvs[0] = new IRrecv(5);
+  irrecvs[1] = new IRrecv(6);
+  irrecvs[2] = new IRrecv(7);
 
   for (int i = 0; i < RECEIVERS; i++) {
     irrecvs[i]->enableIRIn();
+    Serial.println("enable " + String(i));
   }
 
   offset = 700;
@@ -57,9 +59,6 @@ void setup() {
   pinMode(blue, OUTPUT);
   left.attach(13);
   right.attach(12);
-  rgb(0, 0, 0);
-  rgb(0, 255, 0);
-  delay(2000);
   rgb(0, 0, 0);
 }
 
@@ -132,18 +131,17 @@ void sendHit() {
 }
 
 int irRecv() {
-  if (millis - lastHit > 5000) {
-    rgb(0, 0, 0);
-  }
-  //  Serial.print("irRecv");
+//  if (millis() - lastHit > 5000 || millis()- cTime > 5000) {
+//    rgb(0, 0, 0);
+//  }
+//  
   for (int i = 0; i < RECEIVERS; i++) {
     irrecvs[i]->enableIRIn();
     delay(40);
   }
-  for (int i = 0; i < 2; i++) {
-    //    Serial.println ("get results");
-    if (irrecvs[0]->decode(&results))    {
-      //      Serial.println("decode");
+  for (int i = 0; i < RECEIVERS; i++) {
+    if (irrecvs[i]->decode(&results))    {
+      Serial.print("decode" + String(i));
       Serial.println(results.value, HEX);
       if (results.value == 0xB13) {
         Serial.println("water");
@@ -175,9 +173,6 @@ int irRecv() {
           rgb(128, 0, 0);
           lastHit = millis();
         }
-        else {
-          //rgb(0, 0, 0);
-        }
       }
     }
     irrecvs[i]->resume();
@@ -190,7 +185,5 @@ void loop() {
   //turnAt();
   irRecv();
   //sendHit();
-  //  if (millis() - cTime > 5000) {
-  //    rgb(0, 0, 0);
-  //  }
+
 }
