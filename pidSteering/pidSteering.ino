@@ -4,9 +4,9 @@
 #define linePinR A4
 #define linePinC A3
 #define RECEIVERS 3
-#define irRLeftPin 7
-#define irRFrontPin 8
-#define irRRightPin 6
+#define irRLeftPin 6
+#define irRFrontPin 7
+#define irRRightPin 8
 #define sonarPing 2
 #define red 8
 #define green 9
@@ -18,15 +18,12 @@ Servo right;
 Servo left;
 /*
  * *****Progression*****
- * Line Following: COMPLETE --- in function PID steer
- * IR transmition: 
- * IR Receving/LED: 
- * 
- */
-
-
-
-
+   Line Following: COMPLETE --- pidSteer()
+   IR transmition: sending write code -- sendHit()
+   IR Receving/LED: working except receve hit doesnt turn off-- irRecv()
+   Backup control method: none
+   remote control: none
+*/
 int lastHit, cTime, lineL, lineC, lineR, tp, error, offset, lastError, intergral, derivative;
 float kp, ki, kd, steer;
 
@@ -34,12 +31,10 @@ void setup() {
   lastError = 0;
   Serial.begin(9600);
   attachInterrupt(digitalPinToInterrupt(8), irRecv(), CHANGE);
-
   Serial.println("init");
-
   irrecvs[0] = new IRrecv(irRLeftPin);
-  //irrecvs[1] = new IRrecv(irRFrontPin);
-  //irrecvs[2] = new IRrecv(irRRightPin);
+  irrecvs[1] = new IRrecv(irRFrontPin);
+  irrecvs[2] = new IRrecv(irRRightPin);
 
   for (int i = 0; i < RECEIVERS; i++) {
     irrecvs[i]->enableIRIn();
@@ -59,6 +54,9 @@ void setup() {
   pinMode(blue, OUTPUT);
   left.attach(13);
   right.attach(12);
+  rgb(0, 0, 0);
+  rgb(0, 255, 0);
+  delay(2000);
   rgb(0, 0, 0);
 }
 
@@ -125,27 +123,30 @@ void rgb(uint8_t r, uint8_t g, uint8_t b) {
 void sendHit() {
   for (int i  = 0; i < 3; i++) {
     irsend.sendSony(0x5A5 , 3);
-    Serial.println("send hit " + String(i));
-    delay(100);
+    //Serial.println("send hit " + String(i));
+    delay(200);
   }
 }
 
 int irRecv() {
-  Serial.print("irRecv");
+  if(millis - lastHit > 5000){
+    rgb(0,0,0);
+  }
+  //  Serial.print("irRecv");
   for (int i = 0; i < RECEIVERS; i++) {
     irrecvs[i]->enableIRIn();
     delay(40);
   }
   for (int i = 0; i < 2; i++) {
-    Serial.println ("get results");
+    //    Serial.println ("get results");
     if (irrecvs[0]->decode(&results))    {
-      Serial.println("decode");
+      //      Serial.println("decode");
       Serial.println(results.value, HEX);
       if (results.value == 0xB13) {
         Serial.println("water");
         rgb(0, 64, 128);
         cTime = millis();
-      } else if (irrecvs[i] == 0xC9A) {
+      } else if (results.value == 0xC9A) {
         Serial.println("grass");
         rgb(0, 255, 0);
         cTime = millis();
@@ -169,9 +170,10 @@ int irRecv() {
         Serial.println("hit");
         if (millis() - lastHit > 5000) {
           rgb(128, 0, 0);
+          lastHit = millis();
         }
         else {
-          rgb(0, 0, 0);
+          //rgb(0, 0, 0);
         }
       }
     }
@@ -180,12 +182,12 @@ int irRecv() {
 }
 
 void loop() {
-  if (millis() - cTime > 5000) {
-    rgb(0, 0, 0);
-  }
-  pidSteer();
+  
+  //pidSteer();
   //turnAt();
-  //irRecv();
-  //  sendHit();
-  //  delay(200);
+  irRecv();
+  //sendHit();
+//  if (millis() - cTime > 5000) {
+//    rgb(0, 0, 0);
+//  }
 }
