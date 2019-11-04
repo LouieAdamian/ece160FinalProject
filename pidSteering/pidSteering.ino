@@ -12,7 +12,9 @@
 #define green 9
 #define blue 10
 IRrecv *irrecvs[RECEIVERS];
-decode_results results;
+decode_results *results[RECEIVERS];
+
+
 IRsend irsend;
 Servo right;
 Servo left;
@@ -30,7 +32,7 @@ Servo left;
 
 int lastHit, cTime, lineL, lineC, lineR, tp, error, offset, lastError, intergral, derivative;
 float kp, ki, kd, steer;
-
+bool hit;
 void setup() {
   lastError = 0;
   Serial.begin(9600);
@@ -60,6 +62,8 @@ void setup() {
   left.attach(13);
   right.attach(12);
   rgb(0, 0, 0);
+  lastHit = millis();
+  cTime = millis();
 }
 
 float pidSteer() {
@@ -115,7 +119,11 @@ int turnAt() {
     drive(0);
   }
 }
-
+void element(uint8_t r, uint8_t g, uint8_t b) {
+  rgb(r, g, b);
+  cTime = millis();
+  hit = false;
+}
 void rgb(uint8_t r, uint8_t g, uint8_t b) {
   digitalWrite(red, r);
   digitalWrite(green, g);
@@ -131,47 +139,49 @@ void sendHit() {
 }
 
 int irRecv() {
-//  if (millis() - lastHit > 5000 || millis()- cTime > 5000) {
-//    rgb(0, 0, 0);
-//  }
-//  
+  if (hit) {
+    if (millis() - lastHit > 5000) {
+      rgb(0, 0, 0);
+    }
+  }
+  else {
+    if (millis() - cTime > 5000) {
+      rgb(0, 0, 0);
+    }
+  }
+
   for (int i = 0; i < RECEIVERS; i++) {
     irrecvs[i]->enableIRIn();
     delay(40);
   }
   for (int i = 0; i < RECEIVERS; i++) {
-    if (irrecvs[i]->decode(&results))    {
-      Serial.print("decode" + String(i));
-      Serial.println(results.value, HEX);
-      if (results.value == 0xB13) {
+    if (irrecvs[i]->decode(results[i]))    {
+      Serial.print("decode " + String(i));
+      Serial.println(results->value, HEX);
+      if (results->value == 0xB13) {
         Serial.println("water");
-        rgb(0, 64, 128);
-        cTime = millis();
-      } else if (results.value == 0xC9A) {
+        element(0, 64, 128);
+      } else if (results->value == 0xC9A) {
         Serial.println("grass");
-        rgb(0, 255, 0);
-        cTime = millis();
-      } else if (results.value == 0xEA9) {
+        element(0, 255, 0);
+      } else if (results->value == 0xEA9) {
         Serial.println("earth");
-        rgb(128, 20, 128);
-        cTime = millis();
-      } else if (results.value == 0xA19) {
+        element(128, 20, 128);
+      } else if (results->value == 0xA19) {
         Serial.println("air");
-        rgb(255, 255, 255);
-        cTime = millis();
-      } else if (results.value == 0xE1E) {
+        element(255, 255, 255);
+      } else if (results->value == 0xE1E) {
         Serial.println("electricty");
-        rgb(128, 128, 0);
-        cTime = millis();
-      } else if (results.value == 0xF19) {
+        element(128, 128, 0);
+      } else if (results->value == 0xF19) {
         Serial.println("fire");
-        rgb(255, 55, 0);
-        cTime = millis();
-      } else if (results.value == 0x5A5) {
+        element(255, 55, 0);
+      } else if (results->value == 0x5A5) {
         Serial.println("hit");
         if (millis() - lastHit > 5000) {
           rgb(128, 0, 0);
           lastHit = millis();
+          hit = true;
         }
       }
     }
