@@ -20,16 +20,9 @@
 #define elecCode 0xE1E
 #define hitCode 0x5A5
 //colors
-#define red 8
-#define green 9
-#define blue 10
-#define orangeStart 0
-#define greenStart 3
-#define brownStart 6
-#define whiteStart 9
-#define yellowStart 12
-#define blueStart 15
-#define redStart 18
+#define red 8 //t
+#define green 9 //t
+#define blue 10 //t
 //ps2x
 #define PS2_DAT A0
 #define PS2_CMD A1
@@ -37,16 +30,19 @@
 #define PS2_CLK 4
 #define pressures   false
 #define rumble      false
-const uint8_t colors[8][3] = {{255, 55, 0},
-  {0, 255, 0},
-  {128, 20, 128},
-  {255, 255, 255},
-  {128, 128, 0},
-  {0, 64, 128},
-  {128, 0, 0},
+const uint8_t colors[8][3] = {
+  {255, 55, 0},//orange 0 ch
+  {1, 255, 0},//green 1 ch
+  {128, 20, 255},//brown 2 ch
+  {255, 255, 255},//white 3 ch
+  {128, 255, 0},//yellow 4
+  {0, 64, 255},//blue 5 ch
+  {128, 0, 0},//red ch
   {0, 0, 0}
 };
-IRrecv *irrecvs[RECEIVERS];
+static uint8_t pins[] = {5, 6, 7};
+
+IRrecv irrecvs[RECEIVERS] = {IRrecv(irRFrontPin), IRrecv(irRLeftPin), IRrecv(irRRightPin)};
 decode_results results;
 IRsend irsend;
 Servo right;
@@ -71,13 +67,9 @@ byte vibrate = 0;
 void setup() {
   lastError = 0;
   Serial.begin(9600);
-  attachInterrupt(digitalPinToInterrupt(8), irRecv(), CHANGE);
   Serial.println("init");
-  irrecvs[0] = new IRrecv(irRLeftPin);
-  irrecvs[1] = new IRrecv(irRFrontPin);
-  irrecvs[2] = new IRrecv(irRRightPin);
   for (int i = 0; i < RECEIVERS; i++) {
-    irrecvs[i]->enableIRIn();
+    irrecvs[i].enableIRIn();
   }
   pserr = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);
   offset = 700;
@@ -95,11 +87,19 @@ void setup() {
   right.attach(12);
   //blinkC(7);
   //autoMode();
+  for (int i = 0; i > 7; i++) {
+    analogWrite(red, colors[i][0]);
+    analogWrite(green, colors[i][1]);
+    analogWrite(blue, colors[i][2]);
+    delay(1000);
+    Serial.println(i);
+  }
+  autoMode();
 }
-void blinkC(int colorValueStartIndex) {
-  analogWrite(red, colors[0][0]);
-  analogWrite(green, colors[0][1]);
-  analogWrite(blue, colors[0][2]);
+void blinkC(uint8_t index) {
+  analogWrite(red, colors[index][0]);
+  analogWrite(green, colors[index][1]);
+  analogWrite(blue, colors[index][2]);
   ledT = millis();
 }
 float pidSteer() {
@@ -143,89 +143,103 @@ int turnAt() {
 
 void readPS() {
   ps2x.read_gamepad(false, vibrate);
-  Serial.print(ps2x.Analog(PSS_LY), DEC);
-  Serial.print(",");
-  Serial.print(ps2x.Analog(PSS_LX), DEC);
-  Serial.print(",");
-  Serial.print(ps2x.Analog(PSS_RY), DEC);
-  Serial.print(",");
-  Serial.println(ps2x.Analog(PSS_RX), DEC);
-  if (ps2x.ButtonPressed(PSB_CROSS)) {
-    sendHit();
-    Serial.println("send Hit");
+  if ( ps2x.Button(PSB_TRIANGLE)) {
+    drive(0);
+    Serial.println("triangle");
   }
-  if (ps2x.Analog(PSS_LY) < 125 || ps2x.Analog(PSS_LY) > 131) {
-    drive(map(ps2x.Analog(PSS_LX), 0, 255, 0, 360));
+  else if (ps2x.Button(PSB_CROSS)) {
+    drive(360);
+    Serial.println("cross");
+
+  }
+  else if (ps2x.Button(PSB_CIRCLE)) {
+    Serial.println("circle");
+
+    drive(180);
+  }
+  else if (ps2x.Button(PSB_SQUARE)) {
+    drive(-180);
+  }
+  if(ps2x.Button(PSB_PAD_DOWN)){
+    sendHit();
+  }
+  else {
+    left.write(180);
+    right.write(180);
   }
 }
-
 void sendHit() {
   for (int i  = 0; i < 3; i++) {
     irsend.sendSony(0x5A5 , 3);
-    //Serial.println("send hit " + String(i));
+    Serial.println("send hit " + String(i));
     delay(200);
   }
 }
 
 int irRecv() {
-  for (int i = 0; i < RECEIVERS; i++) {
-    if ((!ledT) && (irrecvs[i]->decode(&results)))   // If RGB LED is off and we detect a signal
-    {
-      // This if statement is what checks for valid element codes from the receivers and ignores junk codes
-      if ((results.value == waterCode) || (results.value == airCode) ||
-          (results.value == grassCode) || (results.value == fireCode) ||
-          (results.value == hitCode) || (results.value == earthCode) ||
-          (results.value == elecCode)) {
-        codeReceived = results.value;
-        Serial.println(codeReceived);
+  int codeReceived = 0;
+  if (ledT) {
+    if (ledT - millis() > 5000) {                               // Reset Ton to zero in order to receive
+      for (int i = 0; i < RECEIVERS; i++) {          // ReEnable the receivers when the LED goes off. Put here so that don't get buffer overflow in receiver.
+        irrecvs[i].enableIRIn();
       }
-      else {
-        Serial.println("IRpass");
+    }
+  }
+  else {
+    for (int i = 0; i < RECEIVERS; i++) {
+      irrecvs[i] = IRrecv(pins[i]);
+      irrecvs[i].enableIRIn();
+      delay(100);
+      if (irrecvs[i].decode(&results)) {
+        Serial.println("check 3");
+        if ((results.value == waterCode) || (results.value == airCode) ||
+            (results.value == grassCode) || (results.value == fireCode) ||
+            (results.value == hitCode) || (results.value == earthCode) ||
+            (results.value == elecCode)) {
+          codeReceived = results.value;
+        }
       }
+      Serial.println(results.value, HEX);
     }
   }
   switch (codeReceived) {
     case fireCode:
       blinkC(0);
+      Serial.println("fire");
       break;
 
     case waterCode:
-      blinkC(1);
+      blinkC(5);
+      Serial.println("water");
       break;
 
     case earthCode:
       blinkC(2);
+      Serial.println("earth");
       break;
 
     case airCode:
       blinkC(3);
+      Serial.print("air");
       break;
 
     case elecCode:
       blinkC(4);
+      Serial.println("elec");
       break;
 
     case grassCode:
-      blinkC(5);
+      blinkC(1);
+      Serial.println("grass");
       break;
 
     case hitCode:
       blinkC(6);
+      Serial.println("hit");
       break;
 
     default:  // default is to leave the RGB LED in last state
       break;
-  }
-}
-void ledUpdate() {
-  if ((ledT) && ((ledT + 5000) < millis())) {  // If light is on and 5 seconds passed
-    analogWrite(red, 0);                     // Turn off RGB LED
-    analogWrite(green, 0);
-    analogWrite(blue, 0);
-    ledT = 0;                                    // Reset Ton to zero in order to receive
-    for (int i = 0; i < RECEIVERS; i++) {          // ReEnable the receivers when the LED goes off. Put here so that don't get buffer overflow in receiver.
-      irrecvs[i]->resume();
-    }
   }
 }
 void collisionDetection() {
@@ -239,16 +253,15 @@ void collisionDetection() {
 }
 int autoMode() {
   while (millis() < 40000) {
-    ledUpdate();
     pidSteer();
     irRecv();
   }
 }
 
 void loop() {
-  //ledUpdate();
-  //readPS();
-  // pidSteer();
+    readPS();
+  //pidSteer();
   //turnAt();
   irRecv();
+ // sendHit();
 }
